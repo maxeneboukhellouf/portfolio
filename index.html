@@ -31,8 +31,7 @@
   .name img { display:block; width:100%; height:auto; }
   /* calque blanc du logo : des tranches qui apparaissent en fondu là où le fond est sombre */
   .name .over { position:absolute; inset:0; pointer-events:none; }
-  .over .seg { position:absolute; top:0; bottom:0; overflow:hidden; opacity:0; transition:opacity .25s ease; }
-  .over .seg.on { opacity:1; }
+  .over .seg { position:absolute; top:0; bottom:0; overflow:hidden; opacity:0; }
   .over .seg img { position:absolute; top:0; height:100%; max-width:none; filter:brightness(0) invert(1); }
   .info, footer { transition:color .2s, opacity .2s; }
   .on-dark { color:#fff; }
@@ -509,7 +508,7 @@ function lumBehind(r) {                      // luminosité moyenne (0 noir, 1 b
   return total > 0 ? (sum + (total - covered)) / total : 1;
 }
 const logoEl = $('home'), SEG = 20, overEl = logoEl.querySelector('.over');
-const segs = [], segLum = [], segDark = [];
+const segs = [], logoL = [], logoT = [];
 for (let i = 0; i < SEG; i++) {
   const sg = document.createElement('i'); sg.className = 'seg';
   const im = new Image(); im.src = 'images/logo.png'; im.alt = ''; im.draggable = false;
@@ -524,23 +523,41 @@ function layoutSegs() {                      // chaque tranche montre sa part du
 }
 layoutSegs();
 addEventListener('resize', layoutSegs);
-function adaptLogo(open, exact) {            // chaque tranche passe en blanc si son fond est sombre
+/* Logo : au lieu de basculer noir/blanc, chaque tranche change PROGRESSIVEMENT.
+   La luminosité est « floutée » dans l'espace (on regarde large autour de chaque tranche)
+   et dans le temps (lissage ~0,2 s) : les à-coups des images détaillées disparaissent. */
+let logoLast = 0, logoPrev = 0, loopUntil = 0, loopOn = false;
+function logoStep(now) {
   const r = logoEl.getBoundingClientRect();
-  if (open || !r.width) { segs.forEach(sg => sg.classList.remove('on')); segLum.length = 0; segDark.length = 0; return; }
-  const w = r.width / SEG;
+  if (document.body.classList.contains('open') || !r.width) {
+    segs.forEach(sg => { sg.style.opacity = 0; }); logoL.length = 0; logoT.length = 0; return;
+  }
+  const dt = logoPrev ? Math.min(100, now - logoPrev) : 0; logoPrev = now;
+  if (now - logoLast > 45) {                                   // mesure environ toutes les 45 ms
+    logoLast = now;
+    const w = r.width / SEG;
+    for (let i = 0; i < SEG; i++) {
+      logoT[i] = lumBehind({ left:r.left + w * (i - 1.5), right:r.left + w * (i + 2.5), top:r.top - r.height * 0.5, bottom:r.bottom + r.height * 0.5, width:w * 4, height:r.height * 2 });
+    }
+  }
+  const k = 1 - Math.exp(-dt / 180);
   for (let i = 0; i < SEG; i++) {
-    const l = lumBehind({ left:r.left + w * i, right:r.left + w * (i + 1), top:r.top, bottom:r.bottom, width:w, height:r.height });
-    const v = (exact || segLum[i] === undefined) ? l : segLum[i] * 0.55 + l * 0.45;   // léger lissage pendant le défilement
-    segLum[i] = v;
-    const dark = segDark[i] ? v < 0.52 : v < 0.40;                                      // hystérésis : plus de clignotement
-    segDark[i] = dark;
-    segs[i].classList.toggle('on', dark);
+    if (logoT[i] === undefined) continue;
+    logoL[i] = logoL[i] === undefined ? logoT[i] : logoL[i] + (logoT[i] - logoL[i]) * k;
+    segs[i].style.opacity = Math.max(0, Math.min(1, (0.58 - logoL[i]) / 0.22));   // clair => noir, sombre => blanc, entre les deux => fondu
   }
 }
+function logoLoop(now) {
+  logoStep(now);
+  if (now < loopUntil) requestAnimationFrame(logoLoop); else { loopOn = false; logoPrev = 0; }
+}
+function kickLogo() {
+  loopUntil = performance.now() + 1100;
+  if (!loopOn) { loopOn = true; requestAnimationFrame(logoLoop); }
+}
 const adaptEls = [$('info-btn'), document.querySelector('footer')];
-function adapt(exact) {
+function adapt() {
   const open = document.body.classList.contains('open');
-  adaptLogo(open, exact);
   adaptEls.forEach(el => {
     if (open) { el.classList.remove('on-dark'); return; }
     const r = el.getBoundingClientRect(); if (!r.width) return;
@@ -550,6 +567,7 @@ function adapt(exact) {
 }
 let adaptQueued = false, settleT;
 function scheduleAdapt() {
+  kickLogo();
   if (!adaptQueued) { adaptQueued = true; requestAnimationFrame(() => { adaptQueued = false; adapt(false); }); }
   clearTimeout(settleT); settleT = setTimeout(() => adapt(true), 140);   // une fois le défilement arrêté : mesure exacte
 }
