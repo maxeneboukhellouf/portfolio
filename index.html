@@ -29,7 +29,12 @@
   .name { transition:opacity .2s; }
   .name:hover { opacity:.55; }
   .name img { display:block; width:100%; height:auto; }
-  .info { position:fixed; top:calc(var(--top) + 4px); right:var(--gap); z-index:20; font-size:clamp(22px,2.1vw,30px); font-weight:700; letter-spacing:-.04em; padding:6px 10px; display:none; transition:opacity .2s; }
+  /* calque blanc du logo : visible seulement là où le fond est sombre (masque calculé en JS) */
+  .name { --m:linear-gradient(transparent,transparent); }
+  .name .over { position:absolute; top:0; left:0; height:100%; pointer-events:none; filter:brightness(0) invert(1); -webkit-mask-image:var(--m); mask-image:var(--m); }
+  .info, footer { transition:color .2s, opacity .2s; }
+  .on-dark { color:#fff; }
+  .info { position:fixed; top:calc(var(--top) + 4px); right:var(--gap); z-index:20; font-size:clamp(22px,2.1vw,30px); font-weight:700; letter-spacing:-.04em; padding:6px 10px; display:none; }
   .info.on { display:block; }
   .info:hover { opacity:.55; }
 
@@ -117,7 +122,7 @@
 </head>
 <body>
 
-<a class="name" id="home" href="./" aria-label="maxène boukhellouf, retour à l’accueil"><img src="images/logo.png" alt="maxène boukhellouf" draggable="false"></a>
+<a class="name" id="home" href="./" aria-label="maxène boukhellouf, retour à l’accueil"><img class="base" src="images/logo.png" alt="maxène boukhellouf" draggable="false"><img class="over" src="images/logo.png" alt="" aria-hidden="true" draggable="false"></a>
 <a class="info" id="info-btn" href="#info">info</a>
 <main id="grid" aria-label="Projets"></main>
 <footer>All Rights Reserved © 2026</footer>
@@ -139,6 +144,10 @@
 
 <script src="projets.js"></script>
 <script>
+if (typeof projects === 'undefined') {
+  document.getElementById('grid').innerHTML = '<p style="padding:20px;font-weight:400">projets.js est introuvable : lance mettre-a-jour.command, puis mets tous les fichiers en ligne (index.html, projets.js et les dossiers images, projets, miniatures).</p>';
+  throw new Error('projets.js manquant');
+}
 const FALLBACK = 4 / 3;
 const BASE_TITLE = document.title;
 const $ = id => document.getElementById(id);
@@ -162,12 +171,16 @@ const thumbSrc = (p, i) => (p.thumbs && p.thumbs[i]) || p.images[i];
 
 /* ---------- utilitaires ---------- */
 // Connaît le format réel d'une image avant l'affichage (évite les sauts de mise en page)
-function measure(src, timeout) {
+function measure(src, timeout, alt) {
   return new Promise(res => {
     const i = new Image(); i.decoding = 'async';
-    const t = setTimeout(() => res({ ok:true, ratio:FALLBACK, late:true }), timeout);
-    i.onload  = () => { clearTimeout(t); res({ ok:true, ratio:(i.naturalWidth / i.naturalHeight) || FALLBACK }); };
-    i.onerror = () => { clearTimeout(t); res({ ok:false, ratio:FALLBACK }); };
+    let cur = src, tried = !alt || alt === src;
+    const t = setTimeout(() => res({ ok:true, ratio:FALLBACK, late:true, src:cur }), timeout);
+    i.onload  = () => { clearTimeout(t); res({ ok:true, ratio:(i.naturalWidth / i.naturalHeight) || FALLBACK, src:cur }); };
+    i.onerror = () => {
+      if (!tried) { tried = true; cur = alt; i.src = alt; return; }   // miniature absente : on prend l'image d'origine
+      clearTimeout(t); res({ ok:false, ratio:FALLBACK, src:cur });
+    };
     i.src = src;
   });
 }
@@ -178,8 +191,12 @@ function thumb(src, p, ratio, eager, idx) {
   const img = new Image();
   img.alt = p.title; img.decoding = 'async'; img.loading = eager ? 'eager' : 'lazy';
   img.dataset.i = idx;
-  img.onload  = () => { d.style.aspectRatio = img.naturalWidth + ' / ' + img.naturalHeight; d.classList.add('loaded'); };
-  img.onerror = () => d.classList.add('failed');
+  img.onload  = () => { d.style.aspectRatio = img.naturalWidth + ' / ' + img.naturalHeight; d.classList.add('loaded'); scheduleAdapt(); };
+  let triedAlt = !p.images[idx] || p.images[idx] === src;
+  img.onerror = () => {
+    if (!triedAlt) { triedAlt = true; img.src = p.images[idx]; return; }   // miniature absente : image d'origine
+    d.classList.add('failed');
+  };
   img.src = src;
   d.appendChild(img);
   return d;
@@ -196,14 +213,15 @@ function push(h) {
   if (location.hash === h) return;
   try { history.pushState({ site:1 }, '', h); route(); } catch (e) { location.hash = h; }
 }
-function replaceHash(h) {
-  try { history.replaceState(history.state, '', h || (location.pathname + location.search)); } catch (e) {}
+function replaceHash(h, force) {
+  try { history.replaceState(history.state, '', h || (location.pathname + location.search)); }
+  catch (e) { if (force) location.hash = h; }   // repli pour les navigateurs qui refusent replaceState
 }
 function back() {
   if (history.state && history.state.site) { history.back(); return; }
   let name = ''; try { name = decodeURIComponent(location.hash.slice(1)); } catch (e) {}
   const parts = name.split('/');
-  replaceHash(parts.length > 1 ? '#' + encodeURIComponent(parts[0]) : '');
+  replaceHash(parts.length > 1 ? '#' + encodeURIComponent(parts[0]) : '', true);
   route();
 }
 async function route() {
@@ -221,12 +239,12 @@ async function route() {
 addEventListener('popstate', route);
 
 /* ---------- grille principale ---------- */
-function card(p, ratio, i) {
+function card(p, ratio, i, src) {
   const a = document.createElement('a');
   a.className = 'card';
   a.href = '#' + encodeURIComponent(p.slug);
   a.style.animationDelay = Math.min(i * 70, 700) + 'ms';
-  a.appendChild(thumb(thumbSrc(p, 0), p, ratio, i < 6, 0));
+  a.appendChild(thumb(src || thumbSrc(p, 0), p, ratio, i < 6, 0));
   const cap = document.createElement('div');
   cap.className = 'cap';
   cap.innerHTML = '<span></span>' + (p.date ? '<small></small>' : '');
@@ -249,13 +267,15 @@ function buildGrid() {
   const h = Array(n).fill(0);
   items.forEach((it, i) => {
     const k = h.indexOf(Math.min(...h));
-    cols[k].appendChild(card(it.p, it.ratio, i));
+    cols[k].appendChild(card(it.p, it.ratio, i, it.src));
     h[k] += 1 / it.ratio + 0.09;
   });
+  scheduleAdapt();
 }
-Promise.all(projects.map(p => measure(thumbSrc(p, 0), 1200))).then(rs => {
-  items = projects.map((p, i) => ({ p, ratio:rs[i].ratio, ok:rs[i].ok })).filter(x => x.ok);
+Promise.all(projects.map(p => measure(thumbSrc(p, 0), 1200, p.images[0]))).then(rs => {
+  items = projects.map((p, i) => ({ p, ratio:rs[i].ratio, ok:rs[i].ok, src:rs[i].src })).filter(x => x.ok);
   buildGrid();
+  if (!items.length) grid.innerHTML = '<p style="padding:20px;font-weight:400">Aucune image trouvée : vérifie que les dossiers projets et miniatures sont bien en ligne.</p>';
 });
 (mq.addEventListener ? mq.addEventListener('change', buildGrid) : mq.addListener(buildGrid));
 
@@ -267,6 +287,7 @@ function openPanelUI(title) {
   document.body.classList.add('open');
   panel.setAttribute('aria-hidden', 'false');
   document.title = title + ' — ' + BASE_TITLE;
+  scheduleAdapt();
   $('close').focus({ preventScroll:true });
 }
 function closePanelUI() {
@@ -274,6 +295,7 @@ function closePanelUI() {
   document.body.classList.remove('open');
   panel.setAttribute('aria-hidden', 'true');
   document.title = BASE_TITLE;
+  scheduleAdapt();
 }
 
 // Rangées : 1re image en grand ; ensuite 2 par rangée si leurs formats se ressemblent, sinon pleine largeur
@@ -295,15 +317,15 @@ async function showProject(p) {
   currentProject = p; currentList = [];
   openPanelUI(p.title);
   if (p.text) { const el = document.createElement('p'); el.textContent = p.text; pExtra.appendChild(el); }
-  const ms = await Promise.all(p.images.map((_, i) => measure(thumbSrc(p, i), 2500)));
+  const ms = await Promise.all(p.images.map((_, i) => measure(thumbSrc(p, i), 2500, p.images[i])));
   if (t !== panelToken) return;
   const list = [];
-  ms.forEach((m, i) => { if (m.ok) list.push({ i, ratio:m.ratio }); });
+  ms.forEach((m, i) => { if (m.ok) list.push({ i, ratio:m.ratio, src:m.src }); });
   currentList = list.map(x => x.i);
   buildRows(list).forEach(r => {
     const row = document.createElement('div'); row.className = 'row';
     r.forEach(x => {
-      const th = thumb(thumbSrc(p, x.i), p, x.ratio, x.i < 4, x.i);
+      const th = thumb(x.src || thumbSrc(p, x.i), p, x.ratio, x.i < 4, x.i);
       th.style.flex = (x.ratio * 1000) + ' 1 0%';     // largeur proportionnelle au format => même hauteur dans la rangée
       row.appendChild(th);
     });
@@ -329,7 +351,7 @@ $('close').onclick = back;
 $('veil').onclick = back;
 $('home').onclick = e => {
   e.preventDefault();
-  if (location.hash) { replaceHash(''); route(); }
+  if (location.hash) { replaceHash('', true); route(); }
   window.scrollTo({ top:0, behavior:'smooth' });
 };
 if (hasAbout) {
@@ -442,6 +464,83 @@ stage.addEventListener('wheel', e => {
   zoomAt(z * Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.002)), e.clientX, e.clientY, false);
 }, { passive:false });
 addEventListener('resize', () => { if (z > 1) zReset(); });
+
+/* ---------- lisibilité : logo / info / pied de page passent en blanc sur les images sombres ---------- */
+const lumCache = new WeakMap();
+function lumData(img) {                      // version minuscule de l'image, pour mesurer sa luminosité
+  let c = lumCache.get(img);
+  if (c !== undefined) return c;
+  if (!img.complete || !img.naturalWidth) return null;
+  try {
+    const w = 48, h = Math.max(1, Math.round(w * img.naturalHeight / img.naturalWidth));
+    const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+    const cx = cv.getContext('2d', { willReadFrequently:true });
+    cx.drawImage(img, 0, 0, w, h);
+    cx.getImageData(0, 0, 1, 1);             // erreur si le navigateur interdit la lecture (ex. fichier ouvert hors ligne)
+    c = { cx, w, h };
+  } catch (e) { c = false; }
+  lumCache.set(img, c);
+  return c;
+}
+function lumBehind(r) {                      // luminosité moyenne (0 noir, 1 blanc) derrière un rectangle de l'écran
+  let sum = 0, covered = 0;
+  grid.querySelectorAll('.thumb.loaded img').forEach(img => {
+    const b = img.getBoundingClientRect();
+    const x0 = Math.max(r.left, b.left), x1 = Math.min(r.right, b.right), y0 = Math.max(r.top, b.top), y1 = Math.min(r.bottom, b.bottom);
+    if (x1 <= x0 || y1 <= y0 || !b.width || !b.height) return;
+    const d = lumData(img); if (!d) return;
+    const sx = Math.min(d.w - 1, Math.floor((x0 - b.left) / b.width * d.w)), sy = Math.min(d.h - 1, Math.floor((y0 - b.top) / b.height * d.h));
+    const sw = Math.max(1, Math.min(d.w - sx, Math.ceil((x1 - x0) / b.width * d.w))), sh = Math.max(1, Math.min(d.h - sy, Math.ceil((y1 - y0) / b.height * d.h)));
+    const px = d.cx.getImageData(sx, sy, sw, sh).data;
+    let l = 0, n = 0;
+    for (let i = 0; i < px.length; i += 4) {
+      const a = px[i + 3] / 255, lum = (0.2126 * px[i] + 0.7152 * px[i + 1] + 0.0722 * px[i + 2]) / 255;
+      l += a * lum + (1 - a); n++;           // les zones transparentes comptent comme du blanc
+    }
+    if (!n) return;
+    const area = (x1 - x0) * (y1 - y0); sum += (l / n) * area; covered += area;
+  });
+  const total = r.width * r.height;
+  return total > 0 ? (sum + (total - covered)) / total : 1;
+}
+const logoEl = $('home'), SEG = 20;
+let logoMask = '';
+function adaptLogo(open) {                   // le logo est découpé en tranches : chacune devient blanche si son fond est sombre
+  let m = 'linear-gradient(transparent,transparent)';
+  const r = logoEl.getBoundingClientRect();
+  if (!open && r.width) {
+    const dark = [];
+    for (let i = 0; i < SEG; i++) {
+      const w = r.width / SEG;
+      dark.push(lumBehind({ left:r.left + w * i, right:r.left + w * (i + 1), top:r.top, bottom:r.bottom, width:w, height:r.height }) < 0.45);
+    }
+    if (dark.some(Boolean)) {
+      m = 'linear-gradient(to right,' + dark.map((d, i) => {
+        const c = d ? '#000' : 'transparent';
+        return c + ' ' + (i / SEG * 100) + '%,' + c + ' ' + ((i + 1) / SEG * 100) + '%';
+      }).join(',') + ')';
+    }
+  }
+  if (m !== logoMask) { logoMask = m; logoEl.style.setProperty('--m', m); }
+}
+const adaptEls = [$('info-btn'), document.querySelector('footer')];
+function adapt() {
+  const open = document.body.classList.contains('open');
+  adaptLogo(open);
+  adaptEls.forEach(el => {
+    if (open) { el.classList.remove('on-dark'); return; }
+    const r = el.getBoundingClientRect(); if (!r.width) return;
+    const l = lumBehind(r), was = el.classList.contains('on-dark');
+    el.classList.toggle('on-dark', was ? l < 0.52 : l < 0.42);
+  });
+}
+let adaptQueued = false;
+function scheduleAdapt() {
+  if (adaptQueued) return; adaptQueued = true;
+  requestAnimationFrame(() => { adaptQueued = false; adapt(); });
+}
+addEventListener('scroll', scheduleAdapt, { passive:true });
+addEventListener('resize', scheduleAdapt);
 
 route();   // ouvre directement un projet si l'adresse contient #nom-du-projet
 </script>
