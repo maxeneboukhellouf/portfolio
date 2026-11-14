@@ -1,0 +1,17 @@
+# PAGE "INFO" + APERÇU DE PARTAGE
+# Remplis ce que tu veux afficher et laisse vide le reste, puis double-clique sur mettre-a-jour.command.
+# Le bouton "info" n'apparaît sur le site que si tu remplis au moins une ligne ci-dessous.
+#
+# Tu peux mettre plusieurs lignes "texte:" (un paragraphe par ligne).
+Texte: portfolio
+texte: designer and student in graphic design, based in paris
+email: maxeneboukhellouf@gmail.com
+instagram: maxeneaksel
+# Autres liens, au format : lien: Nom | adresse   (exemple : lien: Behance | https://behance.net/ton-nom)
+lien: pinterest | https://fr.pinterest.com/maxeneaksel/
+lien:
+# L'adresse de ton site une fois en ligne (exemple : https://maxene-boukhellouf.netlify.app)
+# Elle sert à afficher l'image d'aperçu quand tu partages ton lien (Instagram, WhatsApp, LinkedIn...).
+site:
+# Phrase courte affichée dans l'aperçu de partage et sur Google
+description: portfolio maxène aksel boukhellouf

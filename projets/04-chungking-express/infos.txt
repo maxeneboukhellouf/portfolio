@@ -1,0 +1,2 @@
+date:
+texte: Affiche de film.

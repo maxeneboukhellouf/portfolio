@@ -1,0 +1,36 @@
+COMMENT METTRE À JOUR LE SITE
+=============================
+1. Ouvre le dossier "projets". Un dossier = un projet. Mets tes images dedans (jpg, png, webp).
+   - Le nom du dossier devient le titre (les tirets deviennent des espaces).
+   - Les chiffres au début ("01-", "02-") servent juste à choisir l'ordre sur le site.
+   - Les images s'affichent dans l'ordre alphabétique : 1.jpg, 2.jpg, 3.jpg...
+   - La première image est la couverture.
+2. Nouveau projet : crée un nouveau dossier dans "projets" (ex : 06-mon-projet).
+3. Double-clique sur "mettre-a-jour.command". Il fait tout : la liste des projets, les miniatures
+   (pour que le site soit rapide), la page info et l'aperçu de partage.
+   (La première fois sur Mac : clic droit > Ouvrir > Ouvrir.)
+   Si ça ne marche pas : ouvre le Terminal, tape  bash  puis un espace, glisse le fichier dessus, Entrée.
+4. Remets le dossier complet en ligne (Netlify) ou les fichiers modifiés (GitHub).
+
+À SAVOIR
+- Noms de fichiers et de dossiers SANS accents ni espaces : "mori-1.jpg", pas "Mori été.jpg".
+- Images : 2400 à 3000 px de large, moins de 3 Mo (pour que le zoom reste net).
+- Le dossier "miniatures" est créé automatiquement : ne le modifie pas, mais mets-le en ligne aussi.
+
+PAGE "INFO" + APERÇU DE PARTAGE : fichier a-propos.txt
+- Remplis les lignes que tu veux (texte, email, instagram, liens). Laisse vide le reste.
+- Le bouton "info" apparaît en haut à droite du site dès qu'il y a quelque chose à afficher.
+- "site:" = l'adresse de ton site en ligne. Elle permet d'afficher une image quand tu partages
+  ton lien (Instagram, WhatsApp, LinkedIn). L'image est images/apercu.jpg : remplace-la si tu veux.
+- Relance mettre-a-jour.command après chaque modification de a-propos.txt.
+
+LIENS DIRECTS
+- Chaque projet a son adresse : https://ton-site/#nom-du-projet (le nom du dossier sans le numéro).
+- Pour une image précise : https://ton-site/#nom-du-projet/2
+
+OPTIONNEL : titre, date, texte d'un projet
+Dans un dossier de projet, le fichier "infos.txt" permet de choisir :
+   titre: mon titre avec des accents
+   date: 2026
+   texte: une petite description
+(Laisse vide ce que tu ne veux pas afficher.)

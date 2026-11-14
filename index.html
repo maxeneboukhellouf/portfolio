@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>maxène boukhellouf</title>
+<link rel="icon" type="image/png" href="images/favicon.png">
+<link rel="apple-touch-icon" href="images/apple-touch-icon.png">
+<meta name="theme-color" content="#ffffff">
+<!-- og:start -->
+<meta name="description" content="portfolio maxène aksel boukhellouf">
+<meta property="og:type" content="website">
+<meta property="og:title" content="maxène boukhellouf">
+<meta property="og:description" content="portfolio maxène aksel boukhellouf">
+<meta name="twitter:card" content="summary_large_image">
+<!-- og:end -->
+<style>
+  :root { --ink:#1b1b1b; --grey:#9a9a9a; --bg:#fff; --skel:#f0f0f0; --gap:20px; --top:clamp(18px,3.4vw,46px); }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html { scroll-behavior:smooth; }
+  body { background:var(--bg); color:var(--ink); font-family:"Helvetica Neue",Helvetica,Arial,sans-serif; font-weight:500; font-size:19px; letter-spacing:-.02em; -webkit-font-smoothing:antialiased; }
+  a { color:inherit; text-decoration:none; }
+  button { font:inherit; color:inherit; background:none; border:0; cursor:pointer; letter-spacing:inherit; }
+  :focus-visible { outline:2px solid var(--ink); outline-offset:3px; }
+
+  /* logo fixe = bouton home + lien info */
+  .name { position:fixed; top:var(--top); left:clamp(20px,10vw,140px); z-index:20; display:block; width:clamp(190px,36vw,520px); line-height:0; }
+  .name, .name img, .info { cursor:pointer; -webkit-user-select:none; user-select:none; -webkit-user-drag:none; }
+  .name { transition:opacity .2s; }
+  .name:hover { opacity:.55; }
+  .name img { display:block; width:100%; height:auto; }
+  .info { position:fixed; top:calc(var(--top) + 4px); right:var(--gap); z-index:20; font-size:clamp(22px,2.1vw,30px); font-weight:700; letter-spacing:-.04em; padding:6px 10px; display:none; transition:opacity .2s; }
+  .info.on { display:block; }
+  .info:hover { opacity:.55; }
+
+  /* images : fond léger seulement PENDANT le chargement, puis fondu */
+  .thumb { width:100%; background:var(--skel); position:relative; overflow:hidden; }
+  .thumb.loaded { background:none; }
+  .thumb img { display:block; width:100%; height:auto; opacity:0; transition:opacity .45s ease; }
+  .thumb.loaded img { opacity:1; }
+  .thumb.failed { display:none; }
+
+  /* grille principale */
+  main { display:flex; gap:var(--gap); padding:clamp(80px,9vw,120px) var(--gap) 90px; align-items:flex-start; }
+  .col { flex:1; min-width:0; display:flex; flex-direction:column; gap:var(--gap); }
+  .card { display:block; width:100%; text-align:left; opacity:0; transform:translateY(10px); animation:rise .55s cubic-bezier(.2,.7,.2,1) both; }
+  @keyframes rise { to { opacity:1; transform:none; } }
+  .cap { padding-top:8px; font-size:18px; }
+  .cap small { color:var(--grey); font-size:inherit; font-weight:400; margin-left:6px; }
+  @media (hover:hover) {
+    .card .thumb img { transition:opacity .45s ease, transform .7s cubic-bezier(.2,.7,.2,1); }
+    .card:hover .thumb img { transform:scale(1.025); }
+  }
+
+  footer { position:fixed; left:var(--gap); bottom:14px; font-size:18px; z-index:15; pointer-events:none; }
+
+  /* panneau projet / info */
+  .veil { position:fixed; inset:0; background:rgba(255,255,255,.88); opacity:0; visibility:hidden; transition:opacity .35s, visibility .35s; z-index:30; }
+  .panel { position:fixed; top:0; right:0; bottom:0; width:50%; background:var(--bg); z-index:31; overflow-y:auto; overscroll-behavior:contain; padding:0 var(--gap) 60px; transform:translateX(100%); transition:transform .4s cubic-bezier(.2,.7,.2,1); will-change:transform; }
+  body.open .veil { opacity:1; visibility:visible; }
+  body.open .panel { transform:none; }
+  body.open { overflow:hidden; }
+  .panel header { position:sticky; top:0; background:var(--bg); display:flex; justify-content:space-between; align-items:baseline; padding:22px 0 24px; margin-bottom:12px; font-size:clamp(28px,3vw,44px); font-weight:700; letter-spacing:-.04em; z-index:2; }
+  .close { font-size:clamp(15px,1.3vw,18px); font-weight:500; letter-spacing:-.01em; }
+  .close:hover { text-decoration:underline; text-underline-offset:4px; }
+  .panel p { margin:6px 0 18px; font-weight:400; font-size:17px; max-width:60ch; color:#444; line-height:1.45; }
+  .links { list-style:none; margin:8px 0 24px; }
+  .links a { display:inline-block; padding:4px 0; font-size:clamp(22px,2.2vw,32px); font-weight:700; letter-spacing:-.04em; }
+  .links a:hover { text-decoration:underline; text-underline-offset:6px; }
+
+  /* galerie du panneau : chaque rangée a des images de même hauteur, sans trous */
+  .imgs { display:flex; flex-direction:column; gap:var(--gap); }
+  .row { display:flex; gap:var(--gap); align-items:flex-start; }
+  .row .thumb { min-width:0; }
+  .imgs .thumb img { cursor:zoom-in; }
+
+  /* zoom + carrousel */
+  .lb { position:fixed; inset:0; z-index:50; background:#fff; display:flex; flex-direction:column; opacity:0; visibility:hidden; transition:opacity .25s, visibility .25s; }
+  .lb.on { opacity:1; visibility:visible; }
+  .lb-top { display:flex; justify-content:space-between; align-items:baseline; padding:20px var(--gap); font-size:clamp(15px,1.3vw,18px); font-weight:600; letter-spacing:-.02em; }
+  .lb-top .close { font-weight:500; }
+  .lb-stage { flex:1; min-height:0; position:relative; overflow:hidden; display:flex; align-items:center; justify-content:center; padding:0 clamp(70px,9vw,130px); }
+  .lb-stage img { max-width:100%; max-height:calc(100vh - 130px); max-height:calc(100dvh - 130px); width:auto; height:auto; object-fit:contain; display:block; transition:opacity .2s; transform-origin:0 0; touch-action:none; user-select:none; -webkit-user-drag:none; cursor:zoom-in; will-change:transform; }
+  .lb-stage img.anim { transition:opacity .2s, transform .35s cubic-bezier(.2,.7,.2,1); }
+  .lb-stage img.swap { opacity:0; }
+  .lb.zoomed .lb-stage img { cursor:grab; }
+  .lb.dragging .lb-stage img { cursor:grabbing; }
+  .lb.zoomed .arrow, .lb.zoomed .lb-bot { opacity:0; pointer-events:none; }
+  .lb-bot { padding:18px var(--gap) 22px; text-align:center; font-size:15px; font-weight:400; color:var(--grey); letter-spacing:.02em; }
+  .arrow { position:absolute; top:50%; transform:translateY(-50%); padding:22px; color:var(--ink); opacity:.5; transition:opacity .2s, transform .2s; }
+  .arrow svg { display:block; width:44px; height:22px; }
+  .arrow:hover { opacity:1; }
+  .arrow.prev { left:calc(var(--gap) / 2); }
+  .arrow.next { right:calc(var(--gap) / 2); }
+  .arrow.prev:hover { transform:translateY(-50%) translateX(-4px); }
+  .arrow.next:hover { transform:translateY(-50%) translateX(4px); }
+  .lb.single .arrow, .lb.single .lb-bot { display:none; }
+
+  @media (max-width:760px) {
+    .name { left:20px; top:18px; }
+    .info { top:16px; right:10px; font-size:24px; }
+    main { padding-top:78px; }
+    .panel { width:100%; }
+    .row { flex-direction:column; }
+    .row .thumb { flex:none !important; width:100%; }
+    footer { display:none; }
+    .lb-stage { padding:0 var(--gap); }
+    .arrow { top:auto; bottom:2px; transform:none; padding:16px 22px; opacity:.7; }
+    .arrow.prev:hover, .arrow.next:hover { transform:none; }
+    .arrow.prev { left:var(--gap); } .arrow.next { right:var(--gap); }
+  }
+  @media (prefers-reduced-motion:reduce) {
+    * { transition:none !important; }
+    .card { animation:none; opacity:1; transform:none; }
+  }
+</style>
+</head>
+<body>
+
+<a class="name" id="home" href="./" aria-label="maxène boukhellouf, retour à l’accueil"><img src="images/logo.png" alt="maxène boukhellouf" draggable="false"></a>
+<a class="info" id="info-btn" href="#info">info</a>
+<main id="grid" aria-label="Projets"></main>
+<footer>All Rights Reserved © 2026</footer>
+
+<div class="veil" id="veil"></div>
+<aside class="panel" id="panel" aria-hidden="true">
+  <header><span id="p-title"></span><button class="close" id="close">Close</button></header>
+  <div id="p-extra"></div>
+  <div class="imgs" id="p-imgs"></div>
+</aside>
+
+<div class="lb" id="lb" role="dialog" aria-modal="true" aria-label="Agrandissement de l’image">
+  <div class="lb-top"><span id="lb-title"></span><button class="close" id="lb-close">Close</button></div>
+  <div class="lb-stage" id="lb-stage"><img id="lb-img" alt=""></div>
+  <div class="lb-bot" id="lb-count"></div>
+  <button class="arrow prev" id="lb-prev" aria-label="Image précédente"><svg viewBox="0 0 44 22" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M42 11H3M12 2L3 11l9 9"/></svg></button>
+  <button class="arrow next" id="lb-next" aria-label="Image suivante"><svg viewBox="0 0 44 22" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 11h39M32 2l9 9-9 9"/></svg></button>
+</div>
+
+<script src="projets.js"></script>
+<script>
+const FALLBACK = 4 / 3;
+const BASE_TITLE = document.title;
+const $ = id => document.getElementById(id);
+const grid = $('grid'), panel = $('panel'), pImgs = $('p-imgs'), pExtra = $('p-extra');
+const mq = matchMedia('(max-width:760px)');
+const ABOUT = (typeof about !== 'undefined') ? about : null;
+const hasAbout = !!(ABOUT && ((ABOUT.texte && ABOUT.texte.length) || (ABOUT.links && ABOUT.links.length)));
+let items = [];            // projets affichables + format de leur couverture
+let currentProject = null; // projet ouvert dans le panneau
+let currentList = [];      // indices des images chargées du projet ouvert
+let panelToken = 0, routeToken = 0;
+
+/* ---------- projets : adresse (slug) et miniatures ---------- */
+function slugOf(p) {
+  let f = (p.images[0] || '').split('/')[1] || p.title;
+  try { f = decodeURIComponent(f); } catch (e) {}
+  return f.replace(/^\d+[-_ ]*/, '').toLowerCase();
+}
+projects.forEach(p => { p.slug = slugOf(p); });
+const thumbSrc = (p, i) => (p.thumbs && p.thumbs[i]) || p.images[i];
+
+/* ---------- utilitaires ---------- */
+// Connaît le format réel d'une image avant l'affichage (évite les sauts de mise en page)
+function measure(src, timeout) {
+  return new Promise(res => {
+    const i = new Image(); i.decoding = 'async';
+    const t = setTimeout(() => res({ ok:true, ratio:FALLBACK, late:true }), timeout);
+    i.onload  = () => { clearTimeout(t); res({ ok:true, ratio:(i.naturalWidth / i.naturalHeight) || FALLBACK }); };
+    i.onerror = () => { clearTimeout(t); res({ ok:false, ratio:FALLBACK }); };
+    i.src = src;
+  });
+}
+function thumb(src, p, ratio, eager, idx) {
+  const d = document.createElement('div');
+  d.className = 'thumb';
+  d.style.aspectRatio = ratio || FALLBACK;
+  const img = new Image();
+  img.alt = p.title; img.decoding = 'async'; img.loading = eager ? 'eager' : 'lazy';
+  img.dataset.i = idx;
+  img.onload  = () => { d.style.aspectRatio = img.naturalWidth + ' / ' + img.naturalHeight; d.classList.add('loaded'); };
+  img.onerror = () => d.classList.add('failed');
+  img.src = src;
+  d.appendChild(img);
+  return d;
+}
+// Précharge les miniatures d'un projet quand on survole / touche sa vignette
+const warmed = new Set();
+function prefetch(p) {
+  if (warmed.has(p)) return; warmed.add(p);
+  p.images.forEach((_, i) => { const im = new Image(); im.decoding = 'async'; im.src = thumbSrc(p, i); });
+}
+
+/* ---------- navigation (adresse + bouton retour du navigateur) ---------- */
+function push(h) {
+  if (location.hash === h) return;
+  try { history.pushState({ site:1 }, '', h); route(); } catch (e) { location.hash = h; }
+}
+function replaceHash(h) {
+  try { history.replaceState(history.state, '', h || (location.pathname + location.search)); } catch (e) {}
+}
+function back() {
+  if (history.state && history.state.site) { history.back(); return; }
+  let name = ''; try { name = decodeURIComponent(location.hash.slice(1)); } catch (e) {}
+  const parts = name.split('/');
+  replaceHash(parts.length > 1 ? '#' + encodeURIComponent(parts[0]) : '');
+  route();
+}
+async function route() {
+  const t = ++routeToken;
+  let h = ''; try { h = decodeURIComponent(location.hash.slice(1)); } catch (e) {}
+  const [name, idx] = h.split('/');
+  if (name === 'info' && hasAbout) { lbHide(); showAbout(); return; }
+  const p = name ? projects.find(x => x.slug === name) : null;
+  if (!p) { lbHide(); closePanelUI(); return; }
+  await showProject(p);
+  if (t !== routeToken) return;
+  const k = parseInt(idx, 10) - 1;
+  if (idx && k >= 0 && k < currentList.length) lbOpenAt(k); else lbHide();
+}
+addEventListener('popstate', route);
+
+/* ---------- grille principale ---------- */
+function card(p, ratio, i) {
+  const a = document.createElement('a');
+  a.className = 'card';
+  a.href = '#' + encodeURIComponent(p.slug);
+  a.style.animationDelay = Math.min(i * 70, 700) + 'ms';
+  a.appendChild(thumb(thumbSrc(p, 0), p, ratio, i < 6, 0));
+  const cap = document.createElement('div');
+  cap.className = 'cap';
+  cap.innerHTML = '<span></span>' + (p.date ? '<small></small>' : '');
+  cap.firstChild.textContent = p.title;
+  if (p.date) cap.lastChild.textContent = p.date;
+  a.appendChild(cap);
+  a.addEventListener('pointerenter', () => prefetch(p), { once:true });
+  a.addEventListener('touchstart',   () => prefetch(p), { once:true, passive:true });
+  a.addEventListener('click', e => {
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.button) return;   // ouvrir dans un nouvel onglet : comportement normal
+    e.preventDefault(); push(a.getAttribute('href'));
+  });
+  return a;
+}
+// Répartit les projets dans la colonne la moins haute : colonnes équilibrées
+function buildGrid() {
+  grid.innerHTML = '';
+  const n = mq.matches ? 1 : 2;
+  const cols = Array.from({ length:n }, () => { const c = document.createElement('div'); c.className = 'col'; grid.appendChild(c); return c; });
+  const h = Array(n).fill(0);
+  items.forEach((it, i) => {
+    const k = h.indexOf(Math.min(...h));
+    cols[k].appendChild(card(it.p, it.ratio, i));
+    h[k] += 1 / it.ratio + 0.09;
+  });
+}
+Promise.all(projects.map(p => measure(thumbSrc(p, 0), 1200))).then(rs => {
+  items = projects.map((p, i) => ({ p, ratio:rs[i].ratio, ok:rs[i].ok })).filter(x => x.ok);
+  buildGrid();
+});
+(mq.addEventListener ? mq.addEventListener('change', buildGrid) : mq.addListener(buildGrid));
+
+/* ---------- panneau : projet ou info ---------- */
+function openPanelUI(title) {
+  $('p-title').textContent = title;
+  pImgs.innerHTML = ''; pExtra.innerHTML = '';
+  panel.scrollTop = 0;
+  document.body.classList.add('open');
+  panel.setAttribute('aria-hidden', 'false');
+  document.title = title + ' — ' + BASE_TITLE;
+  $('close').focus({ preventScroll:true });
+}
+function closePanelUI() {
+  panelToken++; currentProject = null; currentList = [];
+  document.body.classList.remove('open');
+  panel.setAttribute('aria-hidden', 'true');
+  document.title = BASE_TITLE;
+}
+
+// Rangées : 1re image en grand ; ensuite 2 par rangée si leurs formats se ressemblent, sinon pleine largeur
+function buildRows(list) {
+  const out = [];
+  if (!list.length) return out;
+  out.push([list[0]]);
+  let k = 1;
+  while (k < list.length) {
+    const a = list[k], b = list[k + 1];
+    if (b && Math.max(a.ratio, b.ratio) / Math.min(a.ratio, b.ratio) <= 2.4) { out.push([a, b]); k += 2; }
+    else { out.push([a]); k++; }
+  }
+  return out;
+}
+async function showProject(p) {
+  if (currentProject === p && document.body.classList.contains('open')) return;
+  const t = ++panelToken;
+  currentProject = p; currentList = [];
+  openPanelUI(p.title);
+  if (p.text) { const el = document.createElement('p'); el.textContent = p.text; pExtra.appendChild(el); }
+  const ms = await Promise.all(p.images.map((_, i) => measure(thumbSrc(p, i), 2500)));
+  if (t !== panelToken) return;
+  const list = [];
+  ms.forEach((m, i) => { if (m.ok) list.push({ i, ratio:m.ratio }); });
+  currentList = list.map(x => x.i);
+  buildRows(list).forEach(r => {
+    const row = document.createElement('div'); row.className = 'row';
+    r.forEach(x => {
+      const th = thumb(thumbSrc(p, x.i), p, x.ratio, x.i < 4, x.i);
+      th.style.flex = (x.ratio * 1000) + ' 1 0%';     // largeur proportionnelle au format => même hauteur dans la rangée
+      row.appendChild(th);
+    });
+    pImgs.appendChild(row);
+  });
+}
+function showAbout() {
+  panelToken++; currentProject = null; currentList = [];
+  openPanelUI('info');
+  (ABOUT.texte || []).forEach(l => { const el = document.createElement('p'); el.textContent = l; pExtra.appendChild(el); });
+  if (ABOUT.links && ABOUT.links.length) {
+    const ul = document.createElement('ul'); ul.className = 'links';
+    ABOUT.links.forEach(l => {
+      const li = document.createElement('li'), a = document.createElement('a');
+      a.textContent = l.label; a.href = l.href;
+      if (!/^mailto:/.test(l.href)) { a.target = '_blank'; a.rel = 'noopener'; }
+      li.appendChild(a); ul.appendChild(li);
+    });
+    pExtra.appendChild(ul);
+  }
+}
+$('close').onclick = back;
+$('veil').onclick = back;
+$('home').onclick = e => {
+  e.preventDefault();
+  if (location.hash) { replaceHash(''); route(); }
+  window.scrollTo({ top:0, behavior:'smooth' });
+};
+if (hasAbout) {
+  $('info-btn').classList.add('on');
+  $('info-btn').onclick = e => { e.preventDefault(); push('#info'); };
+}
+
+/* ---------- zoom + carrousel ---------- */
+const lb = $('lb'), lbImg = $('lb-img'), stage = $('lb-stage');
+let lbList = [], lbIdx = 0, lbTitle = '';
+function lbShow(i, instant) {
+  zReset();
+  lbIdx = (i + lbList.length) % lbList.length;
+  const set = () => {
+    const p = currentProject; if (!p) return;
+    const n = lbList.length;
+    lbImg.src = p.images[lbList[lbIdx]];
+    lbImg.alt = lbTitle + ' (' + (lbIdx + 1) + '/' + n + ')';
+    $('lb-count').textContent = (lbIdx + 1) + ' / ' + n;
+    lbImg.classList.remove('swap');
+    [1, -1].forEach(d => { const im = new Image(); im.src = p.images[lbList[(lbIdx + d + n) % n]]; });
+    if (!instant) replaceHash('#' + encodeURIComponent(p.slug) + '/' + (lbIdx + 1));
+  };
+  if (instant) return set();
+  lbImg.classList.add('swap'); setTimeout(set, 120);
+}
+function lbOpenAt(k) {
+  lbList = currentList.slice();
+  lbTitle = currentProject.title;
+  $('lb-title').textContent = lbTitle;
+  lb.classList.toggle('single', lbList.length < 2);
+  lb.classList.add('on');
+  lbShow(k, true);
+  $('lb-close').focus({ preventScroll:true });
+}
+function lbHide() { lb.classList.remove('on'); zReset(); }
+pImgs.addEventListener('click', e => {
+  const img = e.target.closest('.thumb img');
+  if (!img || !currentProject) return;
+  const k = currentList.indexOf(+img.dataset.i);
+  if (k >= 0) push('#' + encodeURIComponent(currentProject.slug) + '/' + (k + 1));
+});
+$('lb-close').onclick = back;
+$('lb-prev').onclick = () => lbShow(lbIdx - 1);
+$('lb-next').onclick = () => lbShow(lbIdx + 1);
+stage.addEventListener('click', e => { if (e.target === stage && z === 1) back(); });
+
+addEventListener('keydown', e => {
+  if (lb.classList.contains('on')) {
+    if (e.key === 'Escape') { if (z > 1) { z = 1; zx = zy = 0; zApply(true); } else back(); }
+    else if (e.key === 'ArrowRight' && lbList.length > 1) lbShow(lbIdx + 1);
+    else if (e.key === 'ArrowLeft'  && lbList.length > 1) lbShow(lbIdx - 1);
+  } else if (e.key === 'Escape' && document.body.classList.contains('open')) back();
+});
+let tx = null;
+lb.addEventListener('touchstart', e => { tx = e.touches[0].clientX; }, { passive:true });
+lb.addEventListener('touchend', e => {
+  if (tx === null || lbList.length < 2 || z > 1) { tx = null; return; }
+  const dx = e.changedTouches[0].clientX - tx; tx = null;
+  if (Math.abs(dx) > 50) lbShow(lbIdx + (dx < 0 ? 1 : -1));
+});
+
+/* zoom dans l'agrandissement : clic, glisser, molette / pincement */
+let z = 1, zx = 0, zy = 0, dragging = false, pressed = null;
+const MAXZ = 5;
+lbImg.draggable = false;
+function zApply(anim) {
+  lbImg.classList.toggle('anim', !!anim);
+  lbImg.style.transform = z === 1 ? '' : 'translate(' + zx + 'px,' + zy + 'px) scale(' + z + ')';
+  lb.classList.toggle('zoomed', z > 1);
+}
+function zClamp() {                       // l'image ne peut pas sortir du cadre
+  const sw = stage.clientWidth, sh = stage.clientHeight;
+  const w = lbImg.offsetWidth * z, h = lbImg.offsetHeight * z, ox = lbImg.offsetLeft, oy = lbImg.offsetTop;
+  zx = w <= sw ? (sw - w) / 2 - ox : Math.min(-ox, Math.max(sw - w - ox, zx));
+  zy = h <= sh ? (sh - h) / 2 - oy : Math.min(-oy, Math.max(sh - h - oy, zy));
+}
+function zoomAt(nz, px, py, anim) {       // zoome en gardant le point (px,py) sous le curseur
+  nz = Math.min(MAXZ, Math.max(1, nz)); if (nz < 1.03) nz = 1;
+  const r = stage.getBoundingClientRect();
+  const ax = px - r.left - lbImg.offsetLeft, ay = py - r.top - lbImg.offsetTop;
+  const lx = (ax - zx) / z, ly = (ay - zy) / z;
+  z = nz; zx = ax - lx * z; zy = ay - ly * z;
+  if (z === 1) { zx = 0; zy = 0; } else zClamp();
+  zApply(anim);
+}
+function zReset() { z = 1; zx = 0; zy = 0; dragging = false; pressed = null; lb.classList.remove('dragging'); zApply(false); }
+lbImg.addEventListener('click', e => {
+  if (dragging) return;
+  e.stopPropagation();
+  if (z > 1) zoomAt(1, e.clientX, e.clientY, true);
+  else zoomAt(Math.max(2, Math.min(3, lbImg.naturalWidth / lbImg.offsetWidth)), e.clientX, e.clientY, true);
+});
+lbImg.addEventListener('pointerdown', e => {
+  if (z > 1) { pressed = { x:e.clientX, y:e.clientY, moved:false }; lbImg.setPointerCapture(e.pointerId); }
+});
+lbImg.addEventListener('pointermove', e => {
+  if (!pressed) return;
+  const dx = e.clientX - pressed.x, dy = e.clientY - pressed.y;
+  if (!pressed.moved && Math.hypot(dx, dy) < 4) return;
+  pressed.moved = true; dragging = true; lb.classList.add('dragging');
+  zx += dx; zy += dy; pressed.x = e.clientX; pressed.y = e.clientY;
+  zClamp(); zApply(false);
+});
+const endDrag = () => { pressed = null; lb.classList.remove('dragging'); setTimeout(() => { dragging = false; }, 0); };
+lbImg.addEventListener('pointerup', endDrag);
+lbImg.addEventListener('pointercancel', endDrag);
+stage.addEventListener('wheel', e => {
+  e.preventDefault();
+  zoomAt(z * Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.002)), e.clientX, e.clientY, false);
+}, { passive:false });
+addEventListener('resize', () => { if (z > 1) zReset(); });
+
+route();   // ouvre directement un projet si l'adresse contient #nom-du-projet
+</script>
+</body>
+</html>
