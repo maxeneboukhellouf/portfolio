@@ -8,10 +8,10 @@
 <link rel="apple-touch-icon" href="images/apple-touch-icon.png">
 <meta name="theme-color" content="#ffffff">
 <!-- og:start -->
-<meta name="description" content="portfolio maxène aksel boukhellouf">
+<meta name="description" content="Portfolio de maxène boukhellouf, graphiste.">
 <meta property="og:type" content="website">
 <meta property="og:title" content="maxène boukhellouf">
-<meta property="og:description" content="portfolio maxène aksel boukhellouf">
+<meta property="og:description" content="Portfolio de maxène boukhellouf, graphiste.">
 <meta name="twitter:card" content="summary_large_image">
 <!-- og:end -->
 <style>
@@ -29,9 +29,11 @@
   .name { transition:opacity .2s; }
   .name:hover { opacity:.55; }
   .name img { display:block; width:100%; height:auto; }
-  /* calque blanc du logo : visible seulement là où le fond est sombre (masque calculé en JS) */
-  .name { --m:linear-gradient(transparent,transparent); }
-  .name .over { position:absolute; top:0; left:0; height:100%; pointer-events:none; filter:brightness(0) invert(1); -webkit-mask-image:var(--m); mask-image:var(--m); }
+  /* calque blanc du logo : des tranches qui apparaissent en fondu là où le fond est sombre */
+  .name .over { position:absolute; inset:0; pointer-events:none; }
+  .over .seg { position:absolute; top:0; bottom:0; overflow:hidden; opacity:0; transition:opacity .25s ease; }
+  .over .seg.on { opacity:1; }
+  .over .seg img { position:absolute; top:0; height:100%; max-width:none; filter:brightness(0) invert(1); }
   .info, footer { transition:color .2s, opacity .2s; }
   .on-dark { color:#fff; }
   .info { position:fixed; top:calc(var(--top) + 4px); right:var(--gap); z-index:20; font-size:clamp(22px,2.1vw,30px); font-weight:700; letter-spacing:-.04em; padding:6px 10px; display:none; }
@@ -122,7 +124,7 @@
 </head>
 <body>
 
-<a class="name" id="home" href="./" aria-label="maxène boukhellouf, retour à l’accueil"><img class="base" src="images/logo.png" alt="maxène boukhellouf" draggable="false"><img class="over" src="images/logo.png" alt="" aria-hidden="true" draggable="false"></a>
+<a class="name" id="home" href="./" aria-label="maxène boukhellouf, retour à l’accueil"><img class="base" src="images/logo.png" alt="maxène boukhellouf" draggable="false"><span class="over" aria-hidden="true"></span></a>
 <a class="info" id="info-btn" href="#info">info</a>
 <main id="grid" aria-label="Projets"></main>
 <footer>All Rights Reserved © 2026</footer>
@@ -142,7 +144,10 @@
   <button class="arrow next" id="lb-next" aria-label="Image suivante"><svg viewBox="0 0 44 22" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 11h39M32 2l9 9-9 9"/></svg></button>
 </div>
 
-<script src="projets.js"></script>
+<script>
+/* charge projets.js à neuf à chaque visite : tes modifications apparaissent tout de suite, sans attendre le cache */
+document.write('<script src="projets.js?v=' + Date.now() + '"><\/script>');
+</script>
 <script>
 if (typeof projects === 'undefined') {
   document.getElementById('grid').innerHTML = '<p style="padding:20px;font-weight:400">projets.js est introuvable : lance mettre-a-jour.command, puis mets tous les fichiers en ligne (index.html, projets.js et les dossiers images, projets, miniatures).</p>';
@@ -472,7 +477,7 @@ function lumData(img) {                      // version minuscule de l'image, po
   if (c !== undefined) return c;
   if (!img.complete || !img.naturalWidth) return null;
   try {
-    const w = 48, h = Math.max(1, Math.round(w * img.naturalHeight / img.naturalWidth));
+    const w = 160, h = Math.max(1, Math.round(w * img.naturalHeight / img.naturalWidth));
     const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
     const cx = cv.getContext('2d', { willReadFrequently:true });
     cx.drawImage(img, 0, 0, w, h);
@@ -503,30 +508,39 @@ function lumBehind(r) {                      // luminosité moyenne (0 noir, 1 b
   const total = r.width * r.height;
   return total > 0 ? (sum + (total - covered)) / total : 1;
 }
-const logoEl = $('home'), SEG = 20;
-let logoMask = '';
-function adaptLogo(open) {                   // le logo est découpé en tranches : chacune devient blanche si son fond est sombre
-  let m = 'linear-gradient(transparent,transparent)';
+const logoEl = $('home'), SEG = 20, overEl = logoEl.querySelector('.over');
+const segs = [], segLum = [], segDark = [];
+for (let i = 0; i < SEG; i++) {
+  const sg = document.createElement('i'); sg.className = 'seg';
+  const im = new Image(); im.src = 'images/logo.png'; im.alt = ''; im.draggable = false;
+  sg.appendChild(im); overEl.appendChild(sg); segs.push(sg);
+}
+function layoutSegs() {                      // chaque tranche montre sa part du logo blanc, parfaitement alignée sur le logo noir
+  const W = logoEl.getBoundingClientRect().width; if (!W) return;
+  segs.forEach((sg, i) => {
+    sg.style.left = (W * i / SEG) + 'px'; sg.style.width = (W / SEG + 1) + 'px';
+    sg.firstChild.style.width = W + 'px'; sg.firstChild.style.left = (-W * i / SEG) + 'px';
+  });
+}
+layoutSegs();
+addEventListener('resize', layoutSegs);
+function adaptLogo(open, exact) {            // chaque tranche passe en blanc si son fond est sombre
   const r = logoEl.getBoundingClientRect();
-  if (!open && r.width) {
-    const dark = [];
-    for (let i = 0; i < SEG; i++) {
-      const w = r.width / SEG;
-      dark.push(lumBehind({ left:r.left + w * i, right:r.left + w * (i + 1), top:r.top, bottom:r.bottom, width:w, height:r.height }) < 0.45);
-    }
-    if (dark.some(Boolean)) {
-      m = 'linear-gradient(to right,' + dark.map((d, i) => {
-        const c = d ? '#000' : 'transparent';
-        return c + ' ' + (i / SEG * 100) + '%,' + c + ' ' + ((i + 1) / SEG * 100) + '%';
-      }).join(',') + ')';
-    }
+  if (open || !r.width) { segs.forEach(sg => sg.classList.remove('on')); segLum.length = 0; segDark.length = 0; return; }
+  const w = r.width / SEG;
+  for (let i = 0; i < SEG; i++) {
+    const l = lumBehind({ left:r.left + w * i, right:r.left + w * (i + 1), top:r.top, bottom:r.bottom, width:w, height:r.height });
+    const v = (exact || segLum[i] === undefined) ? l : segLum[i] * 0.55 + l * 0.45;   // léger lissage pendant le défilement
+    segLum[i] = v;
+    const dark = segDark[i] ? v < 0.52 : v < 0.40;                                      // hystérésis : plus de clignotement
+    segDark[i] = dark;
+    segs[i].classList.toggle('on', dark);
   }
-  if (m !== logoMask) { logoMask = m; logoEl.style.setProperty('--m', m); }
 }
 const adaptEls = [$('info-btn'), document.querySelector('footer')];
-function adapt() {
+function adapt(exact) {
   const open = document.body.classList.contains('open');
-  adaptLogo(open);
+  adaptLogo(open, exact);
   adaptEls.forEach(el => {
     if (open) { el.classList.remove('on-dark'); return; }
     const r = el.getBoundingClientRect(); if (!r.width) return;
@@ -534,10 +548,10 @@ function adapt() {
     el.classList.toggle('on-dark', was ? l < 0.52 : l < 0.42);
   });
 }
-let adaptQueued = false;
+let adaptQueued = false, settleT;
 function scheduleAdapt() {
-  if (adaptQueued) return; adaptQueued = true;
-  requestAnimationFrame(() => { adaptQueued = false; adapt(); });
+  if (!adaptQueued) { adaptQueued = true; requestAnimationFrame(() => { adaptQueued = false; adapt(false); }); }
+  clearTimeout(settleT); settleT = setTimeout(() => adapt(true), 140);   // une fois le défilement arrêté : mesure exacte
 }
 addEventListener('scroll', scheduleAdapt, { passive:true });
 addEventListener('resize', scheduleAdapt);
