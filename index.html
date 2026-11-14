@@ -29,10 +29,9 @@
   .name { transition:opacity .2s; }
   .name:hover { opacity:.55; }
   .name img { display:block; width:100%; height:auto; }
-  /* calque blanc du logo : des tranches qui apparaissent en fondu là où le fond est sombre */
-  .name .over { position:absolute; inset:0; pointer-events:none; }
-  .over .seg { position:absolute; top:0; bottom:0; overflow:hidden; opacity:0; }
-  .over .seg img { position:absolute; top:0; height:100%; max-width:none; filter:brightness(0) invert(1); }
+  /* calque blanc du logo : un dégradé continu (sans coupure) qui le rend blanc là où le fond est sombre */
+  .name { --m:linear-gradient(transparent,transparent); }
+  .name .over { position:absolute; top:0; left:0; height:100%; pointer-events:none; filter:brightness(0) invert(1); -webkit-mask-image:var(--m); mask-image:var(--m); }
   .info, footer { transition:color .2s, opacity .2s; }
   .on-dark { color:#fff; }
   .info { position:fixed; top:calc(var(--top) + 4px); right:var(--gap); z-index:20; font-size:clamp(22px,2.1vw,30px); font-weight:700; letter-spacing:-.04em; padding:6px 10px; display:none; }
@@ -123,7 +122,7 @@
 </head>
 <body>
 
-<a class="name" id="home" href="./" aria-label="maxène boukhellouf, retour à l’accueil"><img class="base" src="images/logo.png" alt="maxène boukhellouf" draggable="false"><span class="over" aria-hidden="true"></span></a>
+<a class="name" id="home" href="./" aria-label="maxène boukhellouf, retour à l’accueil"><img class="base" src="images/logo.png" alt="maxène boukhellouf" draggable="false"><img class="over" src="images/logo.png" alt="" aria-hidden="true" draggable="false"></a>
 <a class="info" id="info-btn" href="#info">info</a>
 <main id="grid" aria-label="Projets"></main>
 <footer>All Rights Reserved © 2026</footer>
@@ -486,13 +485,20 @@ function lumData(img) {                      // version minuscule de l'image, po
   lumCache.set(img, c);
   return c;
 }
-function lumBehind(r) {                      // luminosité moyenne (0 noir, 1 blanc) derrière un rectangle de l'écran
-  let sum = 0, covered = 0;
+function imgRects(area) {                    // images de la grille qui touchent une zone de l'écran
+  const out = [];
   grid.querySelectorAll('.thumb.loaded img').forEach(img => {
     const b = img.getBoundingClientRect();
+    if (!b.width || !b.height || b.right < area.left || b.left > area.right || b.bottom < area.top || b.top > area.bottom) return;
+    const d = lumData(img); if (d) out.push({ b, d });
+  });
+  return out;
+}
+function lumBehind(r, list) {                // luminosité moyenne (0 noir, 1 blanc) derrière un rectangle de l'écran
+  let sum = 0, covered = 0;
+  (list || imgRects(r)).forEach(({ b, d }) => {
     const x0 = Math.max(r.left, b.left), x1 = Math.min(r.right, b.right), y0 = Math.max(r.top, b.top), y1 = Math.min(r.bottom, b.bottom);
-    if (x1 <= x0 || y1 <= y0 || !b.width || !b.height) return;
-    const d = lumData(img); if (!d) return;
+    if (x1 <= x0 || y1 <= y0) return;
     const sx = Math.min(d.w - 1, Math.floor((x0 - b.left) / b.width * d.w)), sy = Math.min(d.h - 1, Math.floor((y0 - b.top) / b.height * d.h));
     const sw = Math.max(1, Math.min(d.w - sx, Math.ceil((x1 - x0) / b.width * d.w))), sh = Math.max(1, Math.min(d.h - sy, Math.ceil((y1 - y0) / b.height * d.h)));
     const px = d.cx.getImageData(sx, sy, sw, sh).data;
@@ -507,45 +513,36 @@ function lumBehind(r) {                      // luminosité moyenne (0 noir, 1 b
   const total = r.width * r.height;
   return total > 0 ? (sum + (total - covered)) / total : 1;
 }
-const logoEl = $('home'), SEG = 20, overEl = logoEl.querySelector('.over');
-const segs = [], logoL = [], logoT = [];
-for (let i = 0; i < SEG; i++) {
-  const sg = document.createElement('i'); sg.className = 'seg';
-  const im = new Image(); im.src = 'images/logo.png'; im.alt = ''; im.draggable = false;
-  sg.appendChild(im); overEl.appendChild(sg); segs.push(sg);
-}
-function layoutSegs() {                      // chaque tranche montre sa part du logo blanc, parfaitement alignée sur le logo noir
-  const W = logoEl.getBoundingClientRect().width; if (!W) return;
-  segs.forEach((sg, i) => {
-    sg.style.left = (W * i / SEG) + 'px'; sg.style.width = (W / SEG + 1) + 'px';
-    sg.firstChild.style.width = W + 'px'; sg.firstChild.style.left = (-W * i / SEG) + 'px';
-  });
-}
-layoutSegs();
-addEventListener('resize', layoutSegs);
-/* Logo : au lieu de basculer noir/blanc, chaque tranche change PROGRESSIVEMENT.
-   La luminosité est « floutée » dans l'espace (on regarde large autour de chaque tranche)
-   et dans le temps (lissage ~0,2 s) : les à-coups des images détaillées disparaissent. */
-let logoLast = 0, logoPrev = 0, loopUntil = 0, loopOn = false;
+const logoEl = $('home'), SEG = 48;
+const logoL = [], logoT = [];
+let logoMask = '', logoLast = 0, logoPrev = 0, loopUntil = 0, loopOn = false;
+function setLogoMask(m) { if (m !== logoMask) { logoMask = m; logoEl.style.setProperty('--m', m); } }
+/* Logo : le blanc apparaît PROGRESSIVEMENT là où le fond est sombre, en dégradé continu (pas de coupure dans les lettres).
+   La luminosité est « floutée » dans l'espace (zone large autour de chaque point) et dans le temps (~0,2 s). */
 function logoStep(now) {
   const r = logoEl.getBoundingClientRect();
   if (document.body.classList.contains('open') || !r.width) {
-    segs.forEach(sg => { sg.style.opacity = 0; }); logoL.length = 0; logoT.length = 0; return;
+    setLogoMask('linear-gradient(transparent,transparent)'); logoL.length = 0; logoT.length = 0; return;
   }
   const dt = logoPrev ? Math.min(100, now - logoPrev) : 0; logoPrev = now;
   if (now - logoLast > 45) {                                   // mesure environ toutes les 45 ms
     logoLast = now;
-    const w = r.width / SEG;
+    const spread = Math.max(30, r.width * 0.09), vy = r.height * 0.5;
+    const list = imgRects({ left:r.left - spread, right:r.right + spread, top:r.top - vy, bottom:r.bottom + vy });
     for (let i = 0; i < SEG; i++) {
-      logoT[i] = lumBehind({ left:r.left + w * (i - 1.5), right:r.left + w * (i + 2.5), top:r.top - r.height * 0.5, bottom:r.bottom + r.height * 0.5, width:w * 4, height:r.height * 2 });
+      const x = r.left + r.width * (i + 0.5) / SEG;
+      logoT[i] = lumBehind({ left:x - spread, right:x + spread, top:r.top - vy, bottom:r.bottom + vy, width:spread * 2, height:r.height + vy * 2 }, list);
     }
   }
   const k = 1 - Math.exp(-dt / 180);
+  const stops = [];
   for (let i = 0; i < SEG; i++) {
-    if (logoT[i] === undefined) continue;
+    if (logoT[i] === undefined) return;
     logoL[i] = logoL[i] === undefined ? logoT[i] : logoL[i] + (logoT[i] - logoL[i]) * k;
-    segs[i].style.opacity = Math.max(0, Math.min(1, (0.58 - logoL[i]) / 0.22));   // clair => noir, sombre => blanc, entre les deux => fondu
+    const o = Math.max(0, Math.min(1, (0.58 - logoL[i]) / 0.22));   // clair => noir, sombre => blanc, entre les deux => fondu
+    stops.push('rgba(0,0,0,' + o.toFixed(2) + ') ' + ((i + 0.5) / SEG * 100).toFixed(2) + '%');
   }
+  setLogoMask('linear-gradient(to right,' + stops.join(',') + ')');
 }
 function logoLoop(now) {
   logoStep(now);
