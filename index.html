@@ -15,7 +15,7 @@
 <meta name="twitter:card" content="summary_large_image">
 <!-- og:end -->
 <style>
-  :root { --ink:#1b1b1b; --grey:#9a9a9a; --bg:#fff; --skel:#f0f0f0; --gap:20px; --top:clamp(18px,3.4vw,46px); }
+  :root { --ink:#1b1b1b; --grey:#6b6b6b; --bg:#fff; --skel:#f0f0f0; --gap:20px; --top:clamp(18px,3.4vw,46px); }
   * { box-sizing:border-box; margin:0; padding:0; }
   html { scroll-behavior:smooth; }
   body { background:var(--bg); color:var(--ink); font-family:"Helvetica Neue",Helvetica,Arial,sans-serif; font-weight:500; font-size:19px; letter-spacing:-.02em; -webkit-font-smoothing:antialiased; }
@@ -72,6 +72,17 @@
   .links { list-style:none; margin:8px 0 24px; }
   .links a { display:inline-block; padding:4px 0; font-size:clamp(22px,2.2vw,32px); font-weight:700; letter-spacing:-.04em; }
   .links a:hover { text-decoration:underline; text-underline-offset:6px; }
+  .links li { display:flex; align-items:baseline; flex-wrap:wrap; gap:6px 16px; }
+  .copy { font-size:15px; font-weight:500; color:var(--grey); letter-spacing:-.01em; }
+  .copy:hover { color:var(--ink); text-decoration:underline; text-underline-offset:4px; }
+
+  /* navigation projet précédent / suivant */
+  .pn { display:flex; justify-content:space-between; gap:var(--gap); margin-top:56px; padding-top:22px; }
+  .pn a { display:block; max-width:48%; }
+  .pn small { display:block; font-size:15px; font-weight:500; color:var(--grey); margin-bottom:6px; letter-spacing:-.01em; }
+  .pn b { display:block; font-size:clamp(20px,2vw,28px); font-weight:700; letter-spacing:-.04em; line-height:1.1; }
+  .pn .next { margin-left:auto; text-align:right; }
+  .pn a:hover b { text-decoration:underline; text-underline-offset:5px; }
 
   /* galerie du panneau : chaque rangée a des images de même hauteur, sans trous */
   .imgs { display:flex; flex-direction:column; gap:var(--gap); }
@@ -132,6 +143,7 @@
   <header><span id="p-title"></span><button class="close" id="close">Close</button></header>
   <div id="p-extra"></div>
   <div class="imgs" id="p-imgs"></div>
+  <nav class="pn" id="p-nav" aria-label="Autres projets"></nav>
 </aside>
 
 <div class="lb" id="lb" role="dialog" aria-modal="true" aria-label="Agrandissement de l’image">
@@ -154,7 +166,7 @@ if (typeof projects === 'undefined') {
 const FALLBACK = 4 / 3;
 const BASE_TITLE = document.title;
 const $ = id => document.getElementById(id);
-const grid = $('grid'), panel = $('panel'), pImgs = $('p-imgs'), pExtra = $('p-extra');
+const grid = $('grid'), panel = $('panel'), pImgs = $('p-imgs'), pExtra = $('p-extra'), pNav = $('p-nav');
 const mq = matchMedia('(max-width:760px)');
 const ABOUT = (typeof about !== 'undefined') ? about : null;
 const hasAbout = !!(ABOUT && ((ABOUT.texte && ABOUT.texte.length) || (ABOUT.links && ABOUT.links.length)));
@@ -162,6 +174,29 @@ let items = [];            // projets affichables + format de leur couverture
 let currentProject = null; // projet ouvert dans le panneau
 let currentList = [];      // indices des images chargées du projet ouvert
 let panelToken = 0, routeToken = 0;
+
+/* ---------- statistiques de visites (GoatCounter : sans cookies) ---------- */
+const STATS = (ABOUT && ABOUT.stats) || '';
+const STATS_ON = !!STATS && location.protocol !== 'file:';
+let lastPath = null;
+if (STATS_ON) {
+  window.goatcounter = { no_onload:true };                 // on compte nous-mêmes chaque projet ouvert
+  const sc = document.createElement('script');
+  sc.async = true; sc.src = 'https://gc.zgo.at/count.js';
+  sc.setAttribute('data-goatcounter', 'https://' + STATS + '.goatcounter.com/count');
+  document.head.appendChild(sc);
+}
+function trackView(path, title) {                         // une vue = un projet ouvert (pas les allers-retours vers l'accueil)
+  if (path === lastPath) return;
+  const first = lastPath === null; lastPath = path;
+  if (!STATS_ON || (path === '/' && !first)) return;
+  let tries = 0;
+  const send = () => {
+    if (window.goatcounter && window.goatcounter.count) { window.goatcounter.count({ path, title }); return true; }
+    return ++tries > 40;
+  };
+  if (!send()) { const t = setInterval(() => { if (send()) clearInterval(t); }, 250); }
+}
 
 /* ---------- projets : adresse (slug) et miniatures ---------- */
 function slugOf(p) {
@@ -220,6 +255,9 @@ function replaceHash(h, force) {
   try { history.replaceState(history.state, '', h || (location.pathname + location.search)); }
   catch (e) { if (force) location.hash = h; }   // repli pour les navigateurs qui refusent replaceState
 }
+function swapProject(h) {                    // passer d'un projet à l'autre SANS empiler l'historique : « Close » ferme toujours le panneau
+  replaceHash(h, true); route();
+}
 function back() {
   if (history.state && history.state.site) { history.back(); return; }
   let name = ''; try { name = decodeURIComponent(location.hash.slice(1)); } catch (e) {}
@@ -231,9 +269,10 @@ async function route() {
   const t = ++routeToken;
   let h = ''; try { h = decodeURIComponent(location.hash.slice(1)); } catch (e) {}
   const [name, idx] = h.split('/');
-  if (name === 'info' && hasAbout) { lbHide(); showAbout(); return; }
+  if (name === 'info' && hasAbout) { trackView('/info', 'info'); lbHide(); showAbout(); return; }
   const p = name ? projects.find(x => x.slug === name) : null;
-  if (!p) { lbHide(); closePanelUI(); return; }
+  if (!p) { trackView('/', 'accueil'); lbHide(); closePanelUI(); return; }
+  trackView('/' + p.slug, p.title);
   await showProject(p);
   if (t !== routeToken) return;
   const k = parseInt(idx, 10) - 1;
@@ -285,7 +324,7 @@ Promise.all(projects.map(p => measure(thumbSrc(p, 0), 1200, p.images[0]))).then(
 /* ---------- panneau : projet ou info ---------- */
 function openPanelUI(title) {
   $('p-title').textContent = title;
-  pImgs.innerHTML = ''; pExtra.innerHTML = '';
+  pImgs.innerHTML = ''; pExtra.innerHTML = ''; pNav.innerHTML = '';
   panel.scrollTop = 0;
   document.body.classList.add('open');
   panel.setAttribute('aria-hidden', 'false');
@@ -334,6 +373,22 @@ async function showProject(p) {
     });
     pImgs.appendChild(row);
   });
+  buildNav(p);
+}
+function buildNav(p) {                       // « Prev / Next » vers les autres projets
+  pNav.innerHTML = '';
+  const n = projects.length; if (n < 2) return;
+  const i = projects.indexOf(p);
+  const mk = (q, cls, label) => {
+    const a = document.createElement('a');
+    a.className = cls; a.href = '#' + encodeURIComponent(q.slug);
+    a.innerHTML = '<small></small><b></b>';
+    a.firstChild.textContent = label; a.lastChild.textContent = q.title;
+    a.addEventListener('click', e => { if (e.metaKey || e.ctrlKey || e.shiftKey || e.button) return; e.preventDefault(); swapProject(a.getAttribute('href')); });
+    return a;
+  };
+  if (n > 2) pNav.appendChild(mk(projects[(i - 1 + n) % n], 'prev', '← Prev'));
+  pNav.appendChild(mk(projects[(i + 1) % n], 'next', 'Next →'));
 }
 function showAbout() {
   panelToken++; currentProject = null; currentList = [];
@@ -345,10 +400,27 @@ function showAbout() {
       const li = document.createElement('li'), a = document.createElement('a');
       a.textContent = l.label; a.href = l.href;
       if (!/^mailto:/.test(l.href)) { a.target = '_blank'; a.rel = 'noopener'; }
-      li.appendChild(a); ul.appendChild(li);
+      li.appendChild(a);
+      if (/^mailto:/.test(l.href)) {
+        const b = document.createElement('button'); b.className = 'copy'; b.type = 'button'; b.textContent = 'copy';
+        b.onclick = () => copyText(l.href.slice(7), b);
+        li.appendChild(b);
+      }
+      ul.appendChild(li);
     });
     pExtra.appendChild(ul);
   }
+}
+function copyText(t, btn) {
+  const old = btn.textContent;
+  const done = () => { btn.textContent = 'copied'; setTimeout(() => { btn.textContent = old; }, 1600); };
+  const fallback = () => {
+    const ta = document.createElement('textarea'); ta.value = t; ta.style.cssText = 'position:fixed;opacity:0';
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); done(); } catch (e) {}
+    ta.remove();
+  };
+  if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(t).then(done, fallback); else fallback();
 }
 $('close').onclick = back;
 $('veil').onclick = back;
@@ -408,6 +480,10 @@ addEventListener('keydown', e => {
     else if (e.key === 'ArrowRight' && lbList.length > 1) lbShow(lbIdx + 1);
     else if (e.key === 'ArrowLeft'  && lbList.length > 1) lbShow(lbIdx - 1);
   } else if (e.key === 'Escape' && document.body.classList.contains('open')) back();
+  else if ((e.key === 'ArrowRight' || e.key === 'ArrowLeft') && currentProject && projects.length > 1 && document.body.classList.contains('open')) {
+    const n = projects.length, i = projects.indexOf(currentProject);
+    swapProject('#' + encodeURIComponent(projects[(i + (e.key === 'ArrowRight' ? 1 : -1) + n) % n].slug));
+  }
 });
 let tx = null;
 lb.addEventListener('touchstart', e => { tx = e.touches[0].clientX; }, { passive:true });

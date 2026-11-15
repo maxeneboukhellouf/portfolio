@@ -59,7 +59,9 @@ count=0
     url=$(printf '%s' "${l#*|}" | sed -e 's/^[[:space:]]*//')
     [ -n "$lab" ] && [ -n "$url" ] && addlink "$lab" "$url"
   done < <(getall "$A" lien)
-  echo "const about = { texte:[${textes}], links:[${links}] };"
+  cv=$(getinfo "$A" cv); [ -n "$cv" ] && addlink "CV" "$(urlenc "$cv")"
+  stats=$(getinfo "$A" stats | sed -E 's#^https?://##; s#\.goatcounter\.com.*$##' | tr -cd 'A-Za-z0-9-')
+  echo "const about = { texte:[${textes}], links:[${links}], stats:\"${stats}\" };"
 
   # ---------- projets ----------
   echo "const projects = ["
@@ -110,6 +112,10 @@ if grep -q '<!-- og:start -->' index.html; then
   awk 'BEGIN{while((getline l < ".og.tmp")>0) blk=blk l "\n"} /<!-- og:start -->/{printf "%s", blk; skip=1} skip&&/<!-- og:end -->/{skip=0; next} !skip{print}' index.html > .index.new && mv .index.new index.html
 fi
 rm -f .og.tmp
+if [ -n "$SITE" ] && [ -f 404.html ] && grep -q '<!-- base:start -->' 404.html; then
+  BASEPATH=$(printf '%s' "$SITE" | sed -E 's#^https?://[^/]+##; s#/*$##')/
+  awk -v b="$BASEPATH" '/<!-- base:start -->/{print "<!-- base:start --><meta name=\"site-base\" content=\"" b "\"><!-- base:end -->"; skip=1} skip&&/<!-- base:end -->/{skip=0; next} !skip{print}' 404.html > .404.new && mv .404.new 404.html
+fi
 
 echo ""
 echo "✅ Site mis à jour : $count projet(s) trouvé(s)."

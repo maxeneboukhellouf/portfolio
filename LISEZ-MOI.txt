@@ -24,6 +24,22 @@ PAGE "INFO" + APERÇU DE PARTAGE : fichier a-propos.txt
   ton lien (Instagram, WhatsApp, LinkedIn). L'image est images/apercu.jpg : remplace-la si tu veux.
 - Relance mettre-a-jour.command après chaque modification de a-propos.txt.
 
+CV EN PDF
+- Mets ton CV (PDF) dans le dossier du site, puis écris son nom dans a-propos.txt : cv: cv-maxene.pdf
+- Un lien "CV" apparaît dans la page info. Pense à mettre le PDF en ligne aussi.
+
+STATISTIQUES DE VISITES (GoatCounter : gratuit, sans cookies)
+1. Va sur goatcounter.com, clique sur "Sign up", choisis un code (exemple : maxene), ton e-mail et un mot de passe.
+2. Écris ce code dans a-propos.txt, après "stats:".
+3. Double-clique sur mettre-a-jour.command, puis remets projets.js en ligne.
+4. Tes statistiques s'affichent sur https://TON-CODE.goatcounter.com (pages vues, projets les plus regardés, pays, sites d'origine).
+- Chaque projet ouvert est compté comme une vue. Rien n'est compté quand tu testes sur ton ordinateur.
+- Certains bloqueurs de publicité empêchent le comptage : les chiffres sont donc un peu sous-estimés.
+
+PAGE D'ERREUR 404
+- Le fichier 404.html est la page affichée quand quelqu'un tape une mauvaise adresse. Mets-le en ligne à la racine, à côté de index.html.
+- Renseigne "site:" dans a-propos.txt pour que son bouton Home pointe au bon endroit (important sur GitHub).
+
 LIENS DIRECTS
 - Chaque projet a son adresse : https://ton-site/#nom-du-projet (le nom du dossier sans le numéro).
 - Pour une image précise : https://ton-site/#nom-du-projet/2
