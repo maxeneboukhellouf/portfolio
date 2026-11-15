@@ -8,10 +8,10 @@
 <link rel="apple-touch-icon" href="images/apple-touch-icon.png">
 <meta name="theme-color" content="#ffffff">
 <!-- og:start -->
-<meta name="description" content="portfolio maxène aksel boukhellouf">
+<meta name="description" content="Portfolio de maxène boukhellouf, graphiste.">
 <meta property="og:type" content="website">
 <meta property="og:title" content="maxène boukhellouf">
-<meta property="og:description" content="portfolio maxène aksel boukhellouf">
+<meta property="og:description" content="Portfolio de maxène boukhellouf, graphiste.">
 <meta name="twitter:card" content="summary_large_image">
 <!-- og:end -->
 <style>
@@ -72,9 +72,6 @@
   .links { list-style:none; margin:8px 0 24px; }
   .links a { display:inline-block; padding:4px 0; font-size:clamp(22px,2.2vw,32px); font-weight:700; letter-spacing:-.04em; }
   .links a:hover { text-decoration:underline; text-underline-offset:6px; }
-  .links li { display:flex; align-items:baseline; flex-wrap:wrap; gap:6px 16px; }
-  .copy { font-size:15px; font-weight:500; color:var(--grey); letter-spacing:-.01em; }
-  .copy:hover { color:var(--ink); text-decoration:underline; text-underline-offset:4px; }
 
   /* navigation projet précédent / suivant */
   .pn { display:flex; justify-content:space-between; gap:var(--gap); margin-top:56px; padding-top:22px; }
@@ -111,6 +108,13 @@
   .arrow.prev:hover { transform:translateY(-50%) translateX(-4px); }
   .arrow.next:hover { transform:translateY(-50%) translateX(4px); }
   .lb.single .arrow, .lb.single .lb-bot { display:none; }
+
+  /* curseur « disque » (souris uniquement) : view / zoom / close */
+  .cur { position:fixed; left:0; top:0; z-index:60; pointer-events:none; will-change:transform; }
+  .cur i { display:flex; align-items:center; justify-content:center; width:58px; height:58px; margin:-29px 0 0 -29px; border-radius:50%; background:var(--ink); color:#fff; font-style:normal; font-size:13px; font-weight:500; letter-spacing:-.01em; transform:scale(.2); opacity:0; transition:transform .28s cubic-bezier(.2,.7,.2,1), opacity .2s, background-color .25s, color .25s; }
+  .cur.on-dark i { background:#fff; color:var(--ink); }
+  .cur.on i { transform:scale(1); opacity:1; }
+  body.has-cur .card, body.has-cur .card *, body.has-cur .imgs .thumb img, body.has-cur .veil, body.has-cur .lb:not(.zoomed) .lb-stage, body.has-cur .lb:not(.zoomed) .lb-stage img { cursor:none; }
 
   @media (max-width:760px) {
     .name { left:20px; top:18px; }
@@ -153,6 +157,8 @@
   <button class="arrow prev" id="lb-prev" aria-label="Image précédente"><svg viewBox="0 0 44 22" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M42 11H3M12 2L3 11l9 9"/></svg></button>
   <button class="arrow next" id="lb-next" aria-label="Image suivante"><svg viewBox="0 0 44 22" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 11h39M32 2l9 9-9 9"/></svg></button>
 </div>
+
+<div class="cur" id="cur" aria-hidden="true"><i></i></div>
 
 <script>
 /* charge projets.js à neuf à chaque visite : tes modifications apparaissent tout de suite, sans attendre le cache */
@@ -390,7 +396,7 @@ function buildNav(p) {                       // « Prev / Next » vers les autre
   if (n > 2) pNav.appendChild(mk(projects[(i - 1 + n) % n], 'prev', '← Prev'));
   pNav.appendChild(mk(projects[(i + 1) % n], 'next', 'Next →'));
 }
-function showAbout() {
+function showAbout() {                       // page info : présentation + contacts
   panelToken++; currentProject = null; currentList = [];
   openPanelUI('info');
   (ABOUT.texte || []).forEach(l => { const el = document.createElement('p'); el.textContent = l; pExtra.appendChild(el); });
@@ -400,27 +406,10 @@ function showAbout() {
       const li = document.createElement('li'), a = document.createElement('a');
       a.textContent = l.label; a.href = l.href;
       if (!/^mailto:/.test(l.href)) { a.target = '_blank'; a.rel = 'noopener'; }
-      li.appendChild(a);
-      if (/^mailto:/.test(l.href)) {
-        const b = document.createElement('button'); b.className = 'copy'; b.type = 'button'; b.textContent = 'copy';
-        b.onclick = () => copyText(l.href.slice(7), b);
-        li.appendChild(b);
-      }
-      ul.appendChild(li);
+      li.appendChild(a); ul.appendChild(li);
     });
     pExtra.appendChild(ul);
   }
-}
-function copyText(t, btn) {
-  const old = btn.textContent;
-  const done = () => { btn.textContent = 'copied'; setTimeout(() => { btn.textContent = old; }, 1600); };
-  const fallback = () => {
-    const ta = document.createElement('textarea'); ta.value = t; ta.style.cssText = 'position:fixed;opacity:0';
-    document.body.appendChild(ta); ta.select();
-    try { document.execCommand('copy'); done(); } catch (e) {}
-    ta.remove();
-  };
-  if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(t).then(done, fallback); else fallback();
 }
 $('close').onclick = back;
 $('veil').onclick = back;
@@ -429,6 +418,7 @@ $('home').onclick = e => {
   if (location.hash) { replaceHash('', true); route(); }
   window.scrollTo({ top:0, behavior:'smooth' });
 };
+
 if (hasAbout) {
   $('info-btn').classList.add('on');
   $('info-btn').onclick = e => { e.preventDefault(); push('#info'); };
@@ -544,11 +534,12 @@ stage.addEventListener('wheel', e => {
 }, { passive:false });
 addEventListener('resize', () => { if (z > 1) zReset(); });
 
-/* ---------- lisibilité : logo / info / pied de page passent en blanc sur les images sombres ---------- */
+/* ---------- lisibilité : logo et pied de page passent en blanc sur les images sombres ---------- */
 const lumCache = new WeakMap();
 function lumData(img) {                      // version minuscule de l'image, pour mesurer sa luminosité
+  const key = img.currentSrc || img.src;
   let c = lumCache.get(img);
-  if (c !== undefined) return c;
+  if (c !== undefined && c.key === key) return c.v;
   if (!img.complete || !img.naturalWidth) return null;
   try {
     const w = 160, h = Math.max(1, Math.round(w * img.naturalHeight / img.naturalWidth));
@@ -558,7 +549,7 @@ function lumData(img) {                      // version minuscule de l'image, po
     cx.getImageData(0, 0, 1, 1);             // erreur si le navigateur interdit la lecture (ex. fichier ouvert hors ligne)
     c = { cx, w, h };
   } catch (e) { c = false; }
-  lumCache.set(img, c);
+  lumCache.set(img, { key, v:c });
   return c;
 }
 function imgRects(area) {                    // images de la grille qui touchent une zone de l'écran
@@ -646,6 +637,69 @@ function scheduleAdapt() {
 }
 addEventListener('scroll', scheduleAdapt, { passive:true });
 addEventListener('resize', scheduleAdapt);
+
+/* ---------- curseur « disque » : view (projets) · zoom (images) · close (fond) — souris uniquement ----------
+   Noir sur fond clair, blanc sur fond sombre (même principe que le logo). */
+if (matchMedia('(hover:hover) and (pointer:fine)').matches) {
+  const cur = $('cur'), curText = cur.querySelector('i');
+  const REDUCE = matchMedia('(prefers-reduced-motion:reduce)').matches;
+  let mx = -200, my = -200, cx = -200, cy = -200, seen = false, looping = false, curLbl = '';
+  let curElem = null, curL = 1, curDark = false, curLastT = 0;
+  document.body.classList.add('has-cur');
+  const place = () => { cur.style.transform = 'translate3d(' + cx + 'px,' + cy + 'px,0)'; };
+  function curLoop() {                       // le disque suit la souris avec un léger retard
+    const k = REDUCE ? 1 : 0.22;
+    cx += (mx - cx) * k; cy += (my - cy) * k; place();
+    if (Math.abs(mx - cx) > 0.3 || Math.abs(my - cy) > 0.3) requestAnimationFrame(curLoop); else looping = false;
+  }
+  const curKick = () => { if (!looping) { looping = true; requestAnimationFrame(curLoop); } };
+  function curLabel(t) {                     // que faut-il écrire dans le disque, selon l'élément sous la souris ?
+    if (!t || !t.closest) return '';
+    if (lb.classList.contains('on')) {
+      if (t.closest('.arrow, .lb-top, .lb-bot') || z > 1) return '';
+      if (t === lbImg) return 'zoom';
+      if (t === stage) return 'close';
+      return '';
+    }
+    if (document.body.classList.contains('open')) {
+      if (t.closest('.panel')) return (t.tagName === 'IMG' && t.closest('#p-imgs')) ? 'zoom' : '';
+      return t.closest('.veil') ? 'close' : '';
+    }
+    return t.closest('.card') ? 'view' : '';
+  }
+  function curMeasure() {                    // luminosité (0 noir, 1 blanc) autour du curseur : seule une image peut être sombre
+    if (!curElem || curElem.tagName !== 'IMG') return 1;
+    const d = lumData(curElem); if (!d) return 1;
+    const sp = 36;
+    return lumBehind({ left:mx - sp, right:mx + sp, top:my - sp, bottom:my + sp, width:sp * 2, height:sp * 2 }, [{ b:curElem.getBoundingClientRect(), d }]);
+  }
+  function curAdapt(first) {                 // lissage + hystérésis : le disque ne clignote pas sur les images détaillées
+    if (!curLbl) return;
+    const now = performance.now(), dt = Math.min(250, now - curLastT); curLastT = now;
+    const l = curMeasure();
+    if (first || dt > 150) curL = l; else curL += (l - curL) * (1 - Math.exp(-dt / 140));
+    const dark = first ? curL < 0.45 : (curDark ? curL < 0.52 : curL < 0.40);
+    if (dark !== curDark) { curDark = dark; cur.classList.toggle('on-dark', dark); }
+  }
+  function setCur(l) {
+    if (l === curLbl) return;
+    if (!curLbl) { cx = mx; cy = my; place(); }   // il apparaît sous la souris, sans glisser depuis un coin
+    curLbl = l;
+    if (l) { curText.textContent = l; cur.classList.add('on'); curAdapt(true); } else cur.classList.remove('on');
+  }
+  let lastMove = 0;
+  addEventListener('pointermove', e => {
+    if (e.pointerType === 'touch') return;
+    mx = e.clientX; my = e.clientY; seen = true; curElem = e.target;
+    setCur(curLabel(e.target)); curKick();
+    const now = performance.now(); if (now - lastMove > 40) { lastMove = now; curAdapt(false); }
+  }, { passive:true });
+  const recheck = () => { if (!seen) return; curElem = document.elementFromPoint(mx, my); setCur(curLabel(curElem)); curAdapt(false); };
+  addEventListener('scroll', recheck, { passive:true });
+  addEventListener('click', () => setTimeout(recheck, 80));
+  setInterval(recheck, 200);                 // met à jour libellé et couleur quand le contenu change sous une souris immobile
+  document.documentElement.addEventListener('mouseleave', () => { seen = false; setCur(''); });
+}
 
 route();   // ouvre directement un projet si l'adresse contient #nom-du-projet
 </script>
