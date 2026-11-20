@@ -3,10 +3,10 @@
 # Le bouton "info" n'apparaît sur le site que si tu remplis au moins une ligne ci-dessous.
 #
 # Tu peux mettre plusieurs lignes "texte:" (un paragraphe par ligne).
-Texte: portfolio
-texte: designer and student in graphic design, based in paris
+Texte: 
+texte: graphic designer & art direction student based in paris
 email: maxeneboukhellouf@gmail.com
-instagram: maxeneaksel
+instagram:
 # Autres liens, au format : lien: Nom | adresse   (exemple : lien: Behance | https://behance.net/ton-nom)
 lien: pinterest | https://fr.pinterest.com/maxeneaksel/
 lien:
